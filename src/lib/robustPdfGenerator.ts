@@ -585,7 +585,7 @@ export async function generateReceiptPNG(formData: ValidatedFormData, bidderNumb
     tempElement.style.left = '-9999px';
     tempElement.style.top = '-9999px';
     tempElement.style.width = '794px'; // A4 width in pixels
-    tempElement.style.minHeight = '1400px'; // زيادة الارتفاع لاستيعاب التوقيع
+    tempElement.style.height = '1123px'; // A4 height in pixels
     tempElement.style.backgroundColor = 'white';
     tempElement.style.padding = '40px';
     tempElement.style.fontFamily = 'Arial, sans-serif';
@@ -600,43 +600,42 @@ export async function generateReceiptPNG(formData: ValidatedFormData, bidderNumb
       return sum + parseNumber(cheque.amount || '0');
     }, 0);
     
-    // Create HTML content for receipt with signature - التوقيع الرقمي فقط
+    // Create HTML content for receipt with signature - يعرض الاتنين
     let receiptSignatureHTML = '';
-    const isSignatureProvidedReceipt = formData.signature && formData.signature.startsWith('data:image');
     
-    console.log('=== Receipt Signature Debug ===');
-    console.log('formData object keys:', Object.keys(formData));
-    console.log('formData.signature exists:', !!formData.signature);
-    console.log('formData.signature type:', typeof formData.signature);
-    console.log('isSignatureProvidedReceipt:', isSignatureProvidedReceipt);
-    if (formData.signature) {
-      console.log('formData.signature length:', formData.signature.length);
-      console.log('formData.signature preview:', formData.signature.substring(0, 100));
-      console.log('Signature starts with data:image?', formData.signature.startsWith('data:image'));
-    } else {
-      console.log('❌ NO SIGNATURE DATA FOUND IN formData');
-    }
-    console.log('===============================');
-    
-    if (isSignatureProvidedReceipt) {
-      receiptSignatureHTML = `
-        <div style="text-align: center; margin-top: 25px; margin-bottom: 35px;">
-          <div style="font-size: 18px; font-weight: bold; color: #000; margin-bottom: 15px;">التوقيع الرقمي:</div>
-          <div style="display: inline-block; padding: 20px; border: 3px solid #000; background-color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <img src="${formData.signature}" style="width: 350px; height: 140px; display: block; object-fit: contain; background: white;" alt="التوقيع الرقمي" />
-          </div>
+    // إذا كان في توقيع رقمي
+    if (formData.signature && formData.signature.startsWith('data:image')) {
+      receiptSignatureHTML += `
+        <div style="text-align: center; margin-top: 15px;">
+          <div style="font-size: 14px; font-weight: bold; color: #666; margin-bottom: 8px;">التوقيع الرقمي:</div>
+          <img src="${formData.signature}" style="max-width: 220px; max-height: 100px; border: 2px solid #666; padding: 8px; background: white;" alt="التوقيع الرقمي" />
         </div>`;
-      console.log('Receipt: Digital signature HTML added');
-    } else {
-      receiptSignatureHTML = `
-        <div style="margin-top: 20px; text-align: center;">
-          <div style="display: inline-block; padding: 20px; border: 2px solid #ccc; background-color: #f9f9f9; min-width: 250px;">
-            <div style="width: 200px; height: 80px; border: 1px solid #ccc; background-color: white; display: flex; align-items: center; justify-content: center; color: #999; font-size: 16px;">
-              (لم يتم التوقيع)
+    }
+    
+    // إذا كان في اسم مطبوع
+    if (formData.typedName && formData.typedName.trim()) {
+      receiptSignatureHTML += `
+        <div style="text-align: center; margin-top: ${receiptSignatureHTML ? '20px' : '15px'};">
+          <div style="font-size: 14px; font-weight: bold; color: #666; margin-bottom: 8px;">الاسم المطبوع:</div>
+          <div style="display: inline-block; padding: 15px; border: 2px solid #333; background-color: #f9f9f9; min-width: 220px;">
+            <div style="width: 180px; height: 70px; border: 1px solid #ccc; background-color: white; display: flex; align-items: center; justify-content: center; color: #333; font-size: 16px; font-weight: bold;">
+              ${formData.typedName}
             </div>
           </div>
         </div>`;
-      console.log('Receipt: No signature provided');
+    }
+    
+    // إذا مفيش حاجة، نعرض اسم الموظف
+    if (!receiptSignatureHTML) {
+      receiptSignatureHTML = `
+        <div style="margin-top: 20px; text-align: center;">
+          <div style="display: inline-block; padding: 20px; border: 2px solid #333; background-color: #f9f9f9; min-width: 250px;">
+            <div style="font-size: 18px; font-weight: bold; color: #000; margin-bottom: 10px;">توقيع الموظف</div>
+            <div style="width: 200px; height: 80px; border: 1px solid #ccc; background-color: white; display: flex; align-items: center; justify-content: center; color: #666; font-size: 16px;">
+              ${formData.employeeName}
+            </div>
+          </div>
+        </div>`;
     }
     
     // Create HTML content for receipt
@@ -691,7 +690,10 @@ export async function generateReceiptPNG(formData: ValidatedFormData, bidderNumb
           <div style="margin-bottom: 10px; font-size: 16px;">
             <span style="font-weight: bold; color: #666; display: inline-block; width: 120px;">التوقيع:</span> 
             <span style="color: #000; font-weight: bold;">
-              ${isSignatureProvidedReceipt ? '✓ تم التوقيع رقمياً' : 'لم يتم التوقيع'}
+              ${formData.signature && formData.signature.startsWith('data:image') ? '✓ رقمي' : ''}
+              ${formData.signature && formData.signature.startsWith('data:image') && formData.typedName ? ' + ' : ''}
+              ${formData.typedName ? '✓ مطبوع' : ''}
+              ${!formData.signature && !formData.typedName ? 'لم يتم التوقيع' : ''}
             </span>
           </div>
         </div>
@@ -705,138 +707,17 @@ export async function generateReceiptPNG(formData: ValidatedFormData, bidderNumb
     
     document.body.appendChild(tempElement);
     
-    // Wait for all images to load (including signature)
-    const images = tempElement.querySelectorAll('img');
-    console.log(`Receipt PDF - Found ${images.length} images to load`);
-    
-    // Create array to track image loading
-    const imageLoadPromises = Array.from(images).map((img, index) => {
-      return new Promise<void>((resolve) => {
-        if (img.complete && img.naturalHeight > 0) {
-          console.log(`Receipt PDF - Image ${index + 1}/${images.length} already loaded:`, img.src.substring(0, 50));
-          resolve();
-        } else {
-          img.onload = () => {
-            console.log(`Receipt PDF - Image ${index + 1}/${images.length} loaded:`, img.src.substring(0, 50));
-            resolve();
-          };
-          img.onerror = () => {
-            console.error(`Receipt PDF - Image ${index + 1}/${images.length} failed:`, img.src.substring(0, 50));
-            resolve(); // Resolve anyway to not block
-          };
-          // Force reload if src is set but not loaded
-          if (img.src && !img.complete) {
-            const currentSrc = img.src;
-            img.src = '';
-            img.src = currentSrc;
-          }
-        }
-      });
-    });
-    
-    await Promise.all(imageLoadPromises);
-    console.log('✅ All images loaded successfully');
-    
-    // Log signature image details
-    const signatureImg = Array.from(images).find(img => img.src.startsWith('data:image'));
-    if (signatureImg) {
-      console.log('🖼️ Signature image details:', {
-        width: signatureImg.width,
-        height: signatureImg.height,
-        naturalWidth: signatureImg.naturalWidth,
-        naturalHeight: signatureImg.naturalHeight,
-        complete: signatureImg.complete,
-        loaded: signatureImg.naturalHeight > 0
-      });
-    }
-    
-    // Extra wait time for rendering - زيادة الوقت
-    console.log('⏳ Waiting 800ms for final rendering...');
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    // Log actual element dimensions before capture
-    console.log('📏 Receipt element actual height:', tempElement.scrollHeight, 'px');
-    console.log('📏 Receipt element actual width:', tempElement.scrollWidth, 'px');
+    // Wait for images to load
+    await new Promise(resolve => setTimeout(resolve, 500));
     
     // Capture the element
-    console.log('Receipt PDF - Starting html2canvas capture');
     const canvas = await html2canvas(tempElement, {
       scale: 2, // Higher quality
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
-      logging: false, // تعطيل السجلات المزعجة
-      ignoreElements: (element) => {
-        // تجاهل صورة التوقيع أثناء الالتقاط - سنرسمها يدوياً
-        if (element.tagName === 'IMG') {
-          const img = element as HTMLImageElement;
-          return img.src.startsWith('data:image');
-        }
-        return false;
-      }
+      logging: false
     });
-    console.log('Receipt PDF - html2canvas capture completed');
-    console.log('📐 Canvas dimensions:', canvas.width, 'x', canvas.height);
-    
-    // رسم التوقيع يدوياً على Canvas
-    if (formData.signature && isSignatureProvidedReceipt) {
-      console.log('🎨 Drawing signature manually on canvas...');
-      
-      try {
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          // إنشاء صورة من base64
-          const signatureImage = new Image();
-          
-          await new Promise<void>((resolve, reject) => {
-            signatureImage.onload = () => {
-              console.log('✅ Signature image loaded for manual drawing');
-              
-              const signatureContainer = tempElement.querySelector('img[src^="data:image"]') as HTMLImageElement;
-              if (signatureContainer) {
-                const rect = signatureContainer.getBoundingClientRect();
-                const tempRect = tempElement.getBoundingClientRect();
-                
-                const relativeX = rect.left - tempRect.left;
-                const relativeY = rect.top - tempRect.top;
-                
-                const canvasX = relativeX * 2;
-                const canvasY = relativeY * 2;
-                const canvasWidth = rect.width * 2;
-                const canvasHeight = rect.height * 2;
-                
-                console.log('📍 Drawing signature at:', { canvasX, canvasY, canvasWidth, canvasHeight });
-                
-                // رسم خلفية بيضاء
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(canvasX, canvasY, canvasWidth, canvasHeight);
-                
-                // رسم الصورة
-                ctx.drawImage(signatureImage, canvasX, canvasY, canvasWidth, canvasHeight);
-                
-                // رسم إطار
-                ctx.strokeStyle = '#000000';
-                ctx.lineWidth = 6;
-                ctx.strokeRect(canvasX, canvasY, canvasWidth, canvasHeight);
-                
-                console.log('✅ Signature drawn successfully on canvas');
-              }
-              
-              resolve();
-            };
-            
-            signatureImage.onerror = () => {
-              console.error('❌ Failed to load signature for manual drawing');
-              reject(new Error('Failed to load signature'));
-            };
-            
-            signatureImage.src = formData.signature || '';
-          });
-        }
-      } catch (error) {
-        console.error('❌ Error drawing signature manually:', error);
-      }
-    }
     
     // Clean up
     document.body.removeChild(tempElement);
@@ -848,6 +729,8 @@ export async function generateReceiptPNG(formData: ValidatedFormData, bidderNumb
         else reject(new Error('Failed to create blob'));
       }, 'image/png', 1.0);
     });
+    
+    const pngDataURL = canvas.toDataURL('image/png', 1.0);
     
     // Convert PNG to PDF
     const pdfResult = await convertPNGToPDF(pngBlob);
@@ -871,7 +754,7 @@ export async function generateDeclarationPNG(formData: ValidatedFormData, bidder
     tempElement.style.left = '-9999px';
     tempElement.style.top = '-9999px';
     tempElement.style.width = '794px'; // A4 width in pixels
-    tempElement.style.minHeight = '1400px'; // زيادة الارتفاع لاستيعاب التوقيع
+    tempElement.style.height = '1123px'; // A4 height in pixels
     tempElement.style.backgroundColor = 'white';
     tempElement.style.padding = '40px';
     tempElement.style.fontFamily = 'Arial, sans-serif';
@@ -903,43 +786,42 @@ export async function generateDeclarationPNG(formData: ValidatedFormData, bidder
       return sum + parseNumber(cheque.amount || '0');
     }, 0);
     
-    // Create HTML content for declaration with signature - التوقيع الرقمي فقط
+    // Create HTML content for declaration with signature (compact version) - يعرض الاتنين
     let signatureHTML = '';
-    const isSignatureProvided = formData.signature && formData.signature.startsWith('data:image');
     
-    console.log('=== Declaration Signature Debug ===');
-    console.log('formData object keys:', Object.keys(formData));
-    console.log('formData.signature exists:', !!formData.signature);
-    console.log('formData.signature type:', typeof formData.signature);
-    console.log('isSignatureProvided:', isSignatureProvided);
-    if (formData.signature) {
-      console.log('formData.signature length:', formData.signature.length);
-      console.log('formData.signature preview:', formData.signature.substring(0, 100));
-      console.log('Signature starts with data:image?', formData.signature.startsWith('data:image'));
-    } else {
-      console.log('❌ NO SIGNATURE DATA FOUND IN formData');
-    }
-    console.log('===================================');
-    
-    if (isSignatureProvided) {
-      signatureHTML = `
-        <div style="text-align: center; margin-top: 20px; margin-bottom: 30px;">
-          <div style="font-size: 16px; font-weight: bold; color: #000; margin-bottom: 12px;">التوقيع الرقمي:</div>
-          <div style="display: inline-block; padding: 15px; border: 3px solid #000; background-color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <img src="${formData.signature}" style="width: 300px; height: 120px; display: block; object-fit: contain; background: white;" alt="التوقيع الرقمي" />
-          </div>
-        </div>`;
-      console.log('Declaration: Digital signature HTML added');
-    } else {
-      signatureHTML = `
+    // إذا كان في توقيع رقمي
+    if (formData.signature && formData.signature.startsWith('data:image')) {
+      signatureHTML += `
         <div style="text-align: center; margin-top: 10px;">
-          <div style="display: inline-block; padding: 12px; border: 2px solid #ccc; background-color: #f9f9f9; min-width: 200px;">
-            <div style="width: 150px; height: 60px; border: 1px solid #ccc; background-color: white; display: flex; align-items: center; justify-content: center; color: #999; font-size: 14px;">
-              (لم يتم التوقيع)
+          <div style="font-size: 12px; font-weight: bold; color: #666; margin-bottom: 5px;">التوقيع الرقمي:</div>
+          <img src="${formData.signature}" style="max-width: 200px; max-height: 80px; border: 2px solid #666; padding: 5px; background: white;" alt="التوقيع الرقمي" />
+        </div>`;
+    }
+    
+    // إذا كان في اسم مطبوع
+    if (formData.typedName && formData.typedName.trim()) {
+      signatureHTML += `
+        <div style="text-align: center; margin-top: ${signatureHTML ? '15px' : '10px'};">
+          <div style="font-size: 12px; font-weight: bold; color: #666; margin-bottom: 5px;">الاسم المطبوع:</div>
+          <div style="display: inline-block; padding: 12px; border: 2px solid #333; background-color: #f9f9f9; min-width: 200px;">
+            <div style="width: 150px; height: 50px; border: 1px solid #ccc; background-color: white; display: flex; align-items: center; justify-content: center; color: #333; font-size: 14px; font-weight: bold;">
+              ${formData.typedName}
             </div>
           </div>
         </div>`;
-      console.log('Declaration: No signature provided');
+    }
+    
+    // إذا مفيش حاجة، نعرض اسم المزايد
+    if (!signatureHTML) {
+      signatureHTML = `
+        <div style="text-align: center; margin-top: 10px;">
+          <div style="display: inline-block; padding: 12px; border: 2px solid #333; background-color: #f9f9f9; min-width: 200px;">
+            <div style="font-size: 13px; font-weight: bold; color: #666; margin-bottom: 8px;">التوقيع</div>
+            <div style="width: 150px; height: 60px; border: 1px solid #ccc; background-color: white; display: flex; align-items: center; justify-content: center; color: #333; font-size: 14px; font-weight: bold;">
+              ${formData.bidderName}
+            </div>
+          </div>
+        </div>`;
     }
     
     // Create HTML content for declaration with compact layout
@@ -1004,7 +886,10 @@ export async function generateDeclarationPNG(formData: ValidatedFormData, bidder
           <div style="font-size: 13px;">
             <span style="font-weight: bold; color: #666;">التوقيع:</span> 
             <span style="color: #000; font-weight: bold;">
-              ${isSignatureProvided ? '✓ تم التوقيع رقمياً' : 'لم يتم التوقيع'}
+              ${formData.signature && formData.signature.startsWith('data:image') ? '✓ رقمي' : ''}
+              ${formData.signature && formData.signature.startsWith('data:image') && formData.typedName ? ' + ' : ''}
+              ${formData.typedName ? '✓ مطبوع' : ''}
+              ${!formData.signature && !formData.typedName ? 'لم يتم التوقيع' : ''}
             </span>
           </div>
         </div>
@@ -1018,145 +903,17 @@ export async function generateDeclarationPNG(formData: ValidatedFormData, bidder
     
     document.body.appendChild(tempElement);
     
-    // Wait for all images to load (including signature)
-    const images = tempElement.querySelectorAll('img');
-    console.log(`Declaration PDF - Found ${images.length} images to load`);
-    
-    // Create array to track image loading
-    const imageLoadPromises = Array.from(images).map((img, index) => {
-      return new Promise<void>((resolve) => {
-        if (img.complete && img.naturalHeight > 0) {
-          console.log(`Declaration PDF - Image ${index + 1}/${images.length} already loaded:`, img.src.substring(0, 50));
-          resolve();
-        } else {
-          img.onload = () => {
-            console.log(`Declaration PDF - Image ${index + 1}/${images.length} loaded:`, img.src.substring(0, 50));
-            resolve();
-          };
-          img.onerror = () => {
-            console.error(`Declaration PDF - Image ${index + 1}/${images.length} failed:`, img.src.substring(0, 50));
-            resolve(); // Resolve anyway to not block
-          };
-          // Force reload if src is set but not loaded
-          if (img.src && !img.complete) {
-            const currentSrc = img.src;
-            img.src = '';
-            img.src = currentSrc;
-          }
-        }
-      });
-    });
-    
-    await Promise.all(imageLoadPromises);
-    console.log('✅ All images loaded successfully');
-    
-    // Log signature image details
-    const signatureImg = Array.from(images).find(img => img.src.startsWith('data:image'));
-    if (signatureImg) {
-      console.log('🖼️ Signature image details:', {
-        width: signatureImg.width,
-        height: signatureImg.height,
-        naturalWidth: signatureImg.naturalWidth,
-        naturalHeight: signatureImg.naturalHeight,
-        complete: signatureImg.complete,
-        loaded: signatureImg.naturalHeight > 0
-      });
-    }
-    
-    // Extra wait time for rendering - زيادة الوقت
-    console.log('⏳ Waiting 800ms for final rendering...');
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    // Log actual element dimensions before capture
-    console.log('📏 Declaration element actual height:', tempElement.scrollHeight, 'px');
-    console.log('📏 Declaration element actual width:', tempElement.scrollWidth, 'px');
+    // Wait for images to load
+    await new Promise(resolve => setTimeout(resolve, 500));
     
     // Capture the element
-    console.log('Declaration PDF - Starting html2canvas capture');
     const canvas = await html2canvas(tempElement, {
       scale: 2, // Higher quality
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
-      logging: false, // تعطيل السجلات المزعجة
-      ignoreElements: (element) => {
-        // تجاهل صورة التوقيع أثناء الالتقاط - سنرسمها يدوياً
-        if (element.tagName === 'IMG') {
-          const img = element as HTMLImageElement;
-          return img.src.startsWith('data:image');
-        }
-        return false;
-      }
+      logging: false
     });
-    console.log('Declaration PDF - html2canvas capture completed');
-    console.log('📐 Canvas dimensions:', canvas.width, 'x', canvas.height);
-    
-    // رسم التوقيع يدوياً على Canvas
-    if (formData.signature && isSignatureProvided) {
-      console.log('🎨 Drawing signature manually on canvas...');
-      
-      try {
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          // إنشاء صورة من base64
-          const signatureImage = new Image();
-          
-          await new Promise<void>((resolve, reject) => {
-            signatureImage.onload = () => {
-              console.log('✅ Signature image loaded for manual drawing');
-              
-              // حساب موقع وحجم التوقيع في Canvas
-              // التوقيع في tempElement موجود في div بحجم 300x120
-              // نحتاج لإيجاد موقعه النسبي في الصفحة
-              
-              const signatureContainer = tempElement.querySelector('img[src^="data:image"]') as HTMLImageElement;
-              if (signatureContainer) {
-                const rect = signatureContainer.getBoundingClientRect();
-                const tempRect = tempElement.getBoundingClientRect();
-                
-                // حساب الموقع النسبي
-                const relativeX = rect.left - tempRect.left;
-                const relativeY = rect.top - tempRect.top;
-                
-                // ضرب في scale (2)
-                const canvasX = relativeX * 2;
-                const canvasY = relativeY * 2;
-                const canvasWidth = rect.width * 2;
-                const canvasHeight = rect.height * 2;
-                
-                console.log('📍 Drawing signature at:', { canvasX, canvasY, canvasWidth, canvasHeight });
-                
-                // رسم خلفية بيضاء للتوقيع
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(canvasX, canvasY, canvasWidth, canvasHeight);
-                
-                // رسم الصورة
-                ctx.drawImage(signatureImage, canvasX, canvasY, canvasWidth, canvasHeight);
-                
-                // رسم إطار
-                ctx.strokeStyle = '#000000';
-                ctx.lineWidth = 6; // 3px * 2 (scale)
-                ctx.strokeRect(canvasX, canvasY, canvasWidth, canvasHeight);
-                
-                console.log('✅ Signature drawn successfully on canvas');
-              }
-              
-              resolve();
-            };
-            
-            signatureImage.onerror = () => {
-              console.error('❌ Failed to load signature for manual drawing');
-              reject(new Error('Failed to load signature'));
-            };
-            
-            signatureImage.src = formData.signature || '';
-          });
-        }
-      } catch (error) {
-        console.error('❌ Error drawing signature manually:', error);
-        // نستمر حتى لو فشل الرسم اليدوي
-      }
-    }
     
     // Clean up
     document.body.removeChild(tempElement);
@@ -1168,6 +925,8 @@ export async function generateDeclarationPNG(formData: ValidatedFormData, bidder
         else reject(new Error('Failed to create blob'));
       }, 'image/png', 1.0);
     });
+    
+    const pngDataURL = canvas.toDataURL('image/png', 1.0);
     
     // Convert PNG to PDF
     const pdfResult = await convertPNGToPDF(pngBlob);

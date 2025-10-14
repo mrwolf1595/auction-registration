@@ -1,0 +1,27 @@
+{
+  "name": "أحمد محمد العتيبي",
+  "idNumber": "1234567890",
+  "phone": "0501234567",
+  "chequeCount": "2",
+  "cheques": [
+    {
+      "number": "CHK001",
+      "amount": "50000"
+    },
+    {
+      "number": "CHK002", 
+      "amount": "30000"
+    }
+  ],
+  "bank": "البنك الأهلي السعودي",
+  "employeeReceiver": "أحمد",
+  "signatureData": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+  "typedName": "أحمد محمد العتيبي",
+  "registrationNumber": 42,
+  "createdAt": "2024-01-15T10:30:00Z",
+  "pdfUrls": {
+    "receipt": "https://firebasestorage.googleapis.com/v0/b/chalet-booking-75258.appspot.com/o/%D9%85%D8%B2%D8%A7%D8%AF%D8%A7%D8%AA%2F%D8%A3%D8%AD%D9%85%D8%AF%20%D9%85%D8%AD%D9%85%D8%AF%20%D8%A7%D9%84%D8%B9%D8%AA%D9%8A%D8%A8%D9%8A%2F2024-01-15_10-30%2F%D8%A7%D9%8A%D8%B5%D8%A7%D9%84_%D8%A7%D8%B3%D8%AA%D9%84%D8%A7%D9%85.pdf?alt=media&token=abc123",
+    "declaration": "https://firebasestorage.googleapis.com/v0/b/chalet-booking-75258.appspot.com/o/%D9%85%D8%B2%D8%A7%D8%AF%D8%A7%D8%AA%2F%D8%A3%D8%AD%D9%85%D8%AF%20%D9%85%D8%AD%D9%85%D8%AF%20%D8%A7%D9%84%D8%B9%D8%AA%D9%8A%D8%A8%D9%8A%2F2024-01-15_10-30%2F%D8%A7%D9%82%D8%B1%D8%A7%D8%B1_%D8%A7%D9%84%D9%85%D8%B2%D8%A7%D9%8A%D8%AF.pdf?alt=media&token=def456"
+  },
+  "totalAmount": 80000
+}

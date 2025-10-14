@@ -1,0 +1,13 @@
+{
+  "rules": {
+    "registrations": {
+      ".read": "auth != null",
+      ".write": true
+    },
+    "auctions": {
+      ".read": true,
+      ".write": "auth != null"
+    }
+  }
+}
+
