@@ -7,6 +7,7 @@ import { saveRegistration, listenToAuctions, getAuctions } from '@/lib/database'
 import { ValidatedFormData } from '@/lib/validation';
 import SubmitFlowModal from '@/components/SubmitFlowModal';
 import SignatureCanvas, { SignatureCanvasRef } from '@/components/SignatureCanvas';
+import toast, { Toaster } from 'react-hot-toast';
 
 // Saudi Banks data
 const saudiBanks = [
@@ -89,6 +90,7 @@ export default function RegisterPage() {
       console.log('All auctions loaded in real-time:', auctions);
       
       // Filter for active/upcoming auctions
+      // Users can only register BEFORE the auction day (not on the auction day itself)
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
@@ -97,7 +99,8 @@ export default function RegisterPage() {
         const auctionDate = new Date(auctionData.date);
         auctionDate.setHours(0, 0, 0, 0);
         
-        return auctionDate >= today && auctionData.status === 'active';
+        // Allow registration only if auction date is AFTER today (not on the same day)
+        return auctionDate > today && auctionData.status === 'active';
       });
       
       console.log('Available auctions:', availableAuctions);
@@ -121,7 +124,8 @@ export default function RegisterPage() {
           const availableAuctions = auctions.filter((auction) => {
             const auctionDate = new Date(auction.date);
             auctionDate.setHours(0, 0, 0, 0);
-            return auctionDate >= today && auction.status === 'active';
+            // Allow registration only if auction date is AFTER today (not on the same day)
+            return auctionDate > today && auction.status === 'active';
           });
           
           setAvailableAuctions(availableAuctions);
@@ -148,17 +152,61 @@ export default function RegisterPage() {
   const onSubmit = async (data: ValidatedFormData) => {
     // التحقق من وجود توقيع رقمي فقط
     if (!signature) {
-      alert('يرجى التوقيع على النموذج للمتابعة');
+      toast.error('يرجى التوقيع على النموذج للمتابعة', {
+        duration: 4000,
+        position: 'top-center',
+        style: {
+          background: '#dc2626',
+          color: '#fff',
+          fontFamily: 'Tajawal, sans-serif',
+          fontSize: '16px',
+          padding: '16px',
+          borderRadius: '12px',
+        },
+      });
       return;
     }
 
     if (!selectedAuction) {
-      alert('يرجى اختيار مزاد للمشاركة');
+      toast.error('يرجى اختيار مزاد للمشاركة', {
+        duration: 4000,
+        position: 'top-center',
+        style: {
+          background: '#dc2626',
+          color: '#fff',
+          fontFamily: 'Tajawal, sans-serif',
+          fontSize: '16px',
+          padding: '16px',
+          borderRadius: '12px',
+        },
+      });
       return;
     }
 
     try {
       const auctionData = selectedAuction as { id: string; name: string; date: string };
+      
+      // Additional validation: Check if auction date is not today or in the past
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const auctionDate = new Date(auctionData.date);
+      auctionDate.setHours(0, 0, 0, 0);
+      
+      if (auctionDate <= today) {
+        toast.error('عذراً، لا يمكن التسجيل في يوم المزاد أو بعده. التسجيل متاح فقط قبل يوم المزاد.', {
+          duration: 5000,
+          position: 'top-center',
+          style: {
+            background: '#dc2626',
+            color: '#fff',
+            fontFamily: 'Tajawal, sans-serif',
+            fontSize: '16px',
+            padding: '16px',
+            borderRadius: '12px',
+          },
+        });
+        return;
+      }
       
       // تحضير بيانات التسجيل - التوقيع الرقمي فقط
       const registrationData = {
@@ -207,7 +255,18 @@ export default function RegisterPage() {
       setIsSubmitFlowOpen(true);
     } catch (error) {
       console.error('Error saving registration:', error);
-      alert('حدث خطأ في حفظ التسجيل. يرجى المحاولة مرة أخرى.');
+      toast.error('حدث خطأ في حفظ التسجيل. يرجى المحاولة مرة أخرى.', {
+        duration: 5000,
+        position: 'top-center',
+        style: {
+          background: '#dc2626',
+          color: '#fff',
+          fontFamily: 'Tajawal, sans-serif',
+          fontSize: '16px',
+          padding: '16px',
+          borderRadius: '12px',
+        },
+      });
     }
   };
 
@@ -220,30 +279,7 @@ export default function RegisterPage() {
     router.push('/register');
   };
 
-  // Function to add sample auction for testing
-  const addSampleAuction = async () => {
-    try {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowString = tomorrow.toISOString().split('T')[0];
-      
-      const sampleAuction = {
-        name: `مزاد تجريبي - ${tomorrowString}`,
-        date: tomorrowString,
-        status: 'active' as const,
-        description: 'مزاد تجريبي للاختبار'
-      };
-
-      // Import saveAuction function dynamically
-      const { saveAuction } = await import('@/lib/database');
-      await saveAuction(sampleAuction);
-      
-      alert('تم إضافة مزاد تجريبي بنجاح!');
-    } catch (error) {
-      console.error('Error adding sample auction:', error);
-      alert('فشل في إضافة المزاد التجريبي. تأكد من تسجيل دخول الموظف.');
-    }
-  };
+  // No longer needed - removed sample auction function
 
   if (isLoadingAuctions) {
     return (
@@ -256,40 +292,8 @@ export default function RegisterPage() {
     );
   }
 
-  if (availableAuctions.length === 0) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto px-4">
-          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl mb-4 shadow-lg">
-              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
-            </div>
-            <h2 className="text-2xl font-bold text-white arabic-text mb-4">
-              النموذج غير متاح حالياً
-            </h2>
-            <p className="text-gray-300 arabic-text mb-6">
-              لا توجد مزادات متاحة للمشاركة حالياً. يرجى متابعتنا لمزيد من المعلومات حول المزادات القادمة.
-            </p>
-            
-            {/* زر إضافة مزاد تجريبي للاختبار */}
-            <button
-              onClick={addSampleAuction}
-              className="w-full px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-semibold rounded-xl transition-all duration-300 transform hover:scale-105 arabic-text"
-            >
-              <span className="flex items-center justify-center gap-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                إضافة مزاد تجريبي للاختبار
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Set flag to disable form when no auctions available
+  const noAuctionsAvailable = availableAuctions.length === 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
@@ -314,12 +318,49 @@ export default function RegisterPage() {
           </p>
         </div>
 
+        {/* Toast Container */}
+        <Toaster position="top-center" reverseOrder={false} />
+
+        {/* Warning Message when no auctions available */}
+        {noAuctionsAvailable && (
+          <div className="max-w-4xl mx-auto mb-6">
+            <div className="backdrop-blur-xl bg-gradient-to-r from-red-500/20 to-orange-500/20 border-2 border-red-400/50 rounded-2xl p-6 shadow-2xl">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <div className="inline-flex items-center justify-center w-12 h-12 bg-red-500/30 rounded-xl">
+                    <svg className="w-6 h-6 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-white arabic-text mb-3">
+                    عذراً، انتهى التسجيل للمزاد
+                  </h3>
+                  <p className="text-white/90 arabic-text leading-relaxed text-lg mb-4">
+                    يرجى متابعتنا لمزيد من المزادات القادمة. للمزيد من المعلومات، يرجى التواصل على الرقم التالي:
+                  </p>
+                  <a 
+                    href="tel:0563859600" 
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                    </svg>
+                    <span className="text-2xl tracking-wider">0563859600</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Main Form Card */}
         <div className="max-w-4xl mx-auto">
           <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl">
             {/* Glassmorphism Header */}
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-2xl mb-4 shadow-lg">
+              <div className={`inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r ${noAuctionsAvailable ? 'from-gray-500 to-gray-600' : 'from-cyan-500 to-purple-500'} rounded-2xl mb-4 shadow-lg`}>
                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -327,8 +368,8 @@ export default function RegisterPage() {
               <h2 className="text-2xl font-bold text-white arabic-text">
                 نموذج التسجيل
               </h2>
-              <p className="text-gray-300 arabic-text mt-2">
-                املأ البيانات التالية للمشاركة في المزاد
+              <p className={`arabic-text mt-2 ${noAuctionsAvailable ? 'text-gray-400' : 'text-gray-300'}`}>
+                {noAuctionsAvailable ? 'التسجيل غير متاح حالياً' : 'املأ البيانات التالية للمشاركة في المزاد'}
               </p>
             </div>
 
@@ -338,7 +379,7 @@ export default function RegisterPage() {
                 <label className="block text-sm font-medium text-cyan-300 arabic-text">
                   المزاد المختار *
                 </label>
-                <div className="flex items-center bg-white/10 border border-white/20 rounded-xl focus-within:ring-2 focus-within:ring-cyan-500 focus-within:border-transparent transition-all duration-300 backdrop-blur-sm">
+                <div className={`flex items-center bg-white/10 border border-white/20 rounded-xl focus-within:ring-2 focus-within:ring-cyan-500 focus-within:border-transparent transition-all duration-300 backdrop-blur-sm ${noAuctionsAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   <select
                     {...register('auction', { required: 'يرجى اختيار مزاد' })}
                     value={selectedAuction ? (selectedAuction as { id: string }).id : ''}
@@ -346,9 +387,12 @@ export default function RegisterPage() {
                       const auction = availableAuctions.find(a => (a as { id: string }).id === e.target.value);
                       setSelectedAuction(auction || null);
                     }}
-                    className="flex-1 px-4 py-3 bg-transparent text-white focus:outline-none arabic-text appearance-none"
+                    disabled={noAuctionsAvailable}
+                    className="flex-1 px-4 py-3 bg-transparent text-white focus:outline-none arabic-text appearance-none disabled:cursor-not-allowed"
                   >
-                    <option value="" className="bg-slate-800 text-white">اختر المزاد</option>
+                    <option value="" className="bg-slate-800 text-white">
+                      {noAuctionsAvailable ? 'لا توجد مزادات متاحة حالياً' : 'اختر المزاد'}
+                    </option>
                     {availableAuctions.map((auction) => {
                       const auctionData = auction as { id: string; name: string; date: string };
                       return (
@@ -374,7 +418,7 @@ export default function RegisterPage() {
                 <label htmlFor="bidderName" className="block text-sm font-medium text-cyan-300 arabic-text">
                   اسم المزايد *
                 </label>
-                <div className="flex items-center bg-white/10 border border-white/20 rounded-xl focus-within:ring-2 focus-within:ring-cyan-500 focus-within:border-transparent transition-all duration-300 backdrop-blur-sm">
+                <div className={`flex items-center bg-white/10 border border-white/20 rounded-xl focus-within:ring-2 focus-within:ring-cyan-500 focus-within:border-transparent transition-all duration-300 backdrop-blur-sm ${noAuctionsAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   <input
                     {...register('bidderName', { 
                       required: 'اسم المزايد مطلوب',
@@ -383,7 +427,8 @@ export default function RegisterPage() {
                     type="text"
                     id="bidderName"
                     placeholder="أدخل اسمك الكامل"
-                    className="flex-1 px-4 py-3 bg-transparent text-white placeholder-gray-400 focus:outline-none arabic-text"
+                    disabled={noAuctionsAvailable}
+                    className="flex-1 px-4 py-3 bg-transparent text-white placeholder-gray-400 focus:outline-none arabic-text disabled:cursor-not-allowed"
                   />
                   <div className="px-3">
                     <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -401,7 +446,7 @@ export default function RegisterPage() {
                 <label htmlFor="idNumber" className="block text-sm font-medium text-cyan-300 arabic-text">
                   رقم الهوية *
                 </label>
-                <div className="flex items-center bg-white/10 border border-white/20 rounded-xl focus-within:ring-2 focus-within:ring-cyan-500 focus-within:border-transparent transition-all duration-300 backdrop-blur-sm">
+                <div className={`flex items-center bg-white/10 border border-white/20 rounded-xl focus-within:ring-2 focus-within:ring-cyan-500 focus-within:border-transparent transition-all duration-300 backdrop-blur-sm ${noAuctionsAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   <input
                     {...register('idNumber', { 
                       required: 'رقم الهوية مطلوب',
@@ -413,7 +458,8 @@ export default function RegisterPage() {
                     type="text"
                     id="idNumber"
                     placeholder="أدخل رقم الهوية (10 أرقام)"
-                    className="flex-1 px-4 py-3 bg-transparent text-white placeholder-gray-400 focus:outline-none arabic-text"
+                    disabled={noAuctionsAvailable}
+                    className="flex-1 px-4 py-3 bg-transparent text-white placeholder-gray-400 focus:outline-none arabic-text disabled:cursor-not-allowed"
                   />
                   <div className="px-3">
                     <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -431,7 +477,7 @@ export default function RegisterPage() {
                 <label htmlFor="phoneNumber" className="block text-sm font-medium text-cyan-300 arabic-text">
                   رقم الجوال *
                 </label>
-                <div className="flex items-center bg-white/10 border border-white/20 rounded-xl focus-within:ring-2 focus-within:ring-cyan-500 focus-within:border-transparent transition-all duration-300 backdrop-blur-sm">
+                <div className={`flex items-center bg-white/10 border border-white/20 rounded-xl focus-within:ring-2 focus-within:ring-cyan-500 focus-within:border-transparent transition-all duration-300 backdrop-blur-sm ${noAuctionsAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   <input
                     {...register('phoneNumber', { 
                       required: 'رقم الجوال مطلوب',
@@ -443,7 +489,8 @@ export default function RegisterPage() {
                     type="tel"
                     id="phoneNumber"
                     placeholder="05xxxxxxxx"
-                    className="flex-1 px-4 py-3 bg-transparent text-white placeholder-gray-400 focus:outline-none arabic-text"
+                    disabled={noAuctionsAvailable}
+                    className="flex-1 px-4 py-3 bg-transparent text-white placeholder-gray-400 focus:outline-none arabic-text disabled:cursor-not-allowed"
                   />
                   <div className="px-3">
                     <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -462,11 +509,12 @@ export default function RegisterPage() {
                 <label htmlFor="checkCount" className="block text-sm font-medium text-cyan-300 arabic-text">
                   عدد الشيكات *
                 </label>
-                <div className="flex items-center bg-white/10 border border-white/20 rounded-xl focus-within:ring-2 focus-within:ring-cyan-500 focus-within:border-transparent transition-all duration-300 backdrop-blur-sm">
+                <div className={`flex items-center bg-white/10 border border-white/20 rounded-xl focus-within:ring-2 focus-within:ring-cyan-500 focus-within:border-transparent transition-all duration-300 backdrop-blur-sm ${noAuctionsAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   <select
                     {...register('checkCount', { required: 'عدد الشيكات مطلوب' })}
                     id="checkCount"
-                    className="flex-1 px-4 py-3 bg-transparent text-white focus:outline-none arabic-text appearance-none"
+                    disabled={noAuctionsAvailable}
+                    className="flex-1 px-4 py-3 bg-transparent text-white focus:outline-none arabic-text appearance-none disabled:cursor-not-allowed"
                   >
                     <option value="1" className="bg-slate-800 text-white">1 شيك</option>
                     <option value="2" className="bg-slate-800 text-white">2 شيك</option>
@@ -490,11 +538,12 @@ export default function RegisterPage() {
                 <label htmlFor="issuingBank" className="block text-sm font-medium text-cyan-300 arabic-text">
                   البنك المصدر للشيك *
                 </label>
-                <div className="flex items-center bg-white/10 border border-white/20 rounded-xl focus-within:ring-2 focus-within:ring-cyan-500 focus-within:border-transparent transition-all duration-300 backdrop-blur-sm">
+                <div className={`flex items-center bg-white/10 border border-white/20 rounded-xl focus-within:ring-2 focus-within:ring-cyan-500 focus-within:border-transparent transition-all duration-300 backdrop-blur-sm ${noAuctionsAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   <select
                     {...register('issuingBank', { required: 'البنك المصدر مطلوب' })}
                     id="issuingBank"
-                    className="flex-1 px-4 py-3 bg-transparent text-white focus:outline-none arabic-text appearance-none"
+                    disabled={noAuctionsAvailable}
+                    className="flex-1 px-4 py-3 bg-transparent text-white focus:outline-none arabic-text appearance-none disabled:cursor-not-allowed"
                   >
                     <option value="" className="bg-slate-800 text-white">اختر البنك</option>
                     {saudiBanks.map((bank, index) => (
@@ -529,7 +578,8 @@ export default function RegisterPage() {
                         })}
                         type="text"
                         placeholder="رقم الشيك"
-                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all duration-300 arabic-text backdrop-blur-sm"
+                        disabled={noAuctionsAvailable}
+                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all duration-300 arabic-text backdrop-blur-sm disabled:cursor-not-allowed disabled:opacity-60"
                       />
                       {errors[`chequeNumber${index + 1}` as keyof typeof errors] && (
                         <p className="text-red-400 text-sm arabic-text">
@@ -556,7 +606,8 @@ export default function RegisterPage() {
                             {...field}
                             type="text"
                             placeholder="0"
-                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all duration-300 arabic-text backdrop-blur-sm"
+                            disabled={noAuctionsAvailable}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all duration-300 arabic-text backdrop-blur-sm disabled:cursor-not-allowed disabled:opacity-60"
                             value={field.value ? formatNumber(field.value as string) : ''}
                             onChange={(e) => {
                               const formatted = formatNumber(e.target.value);
@@ -611,47 +662,51 @@ export default function RegisterPage() {
                 <label className="block text-sm font-medium text-cyan-300 arabic-text">
                   التوقيع أو الاسم المطبوع *
                 </label>
-                <div className="bg-white/5 rounded-xl border border-white/10 p-4 space-y-4">
+                <div className={`bg-white/5 rounded-xl border border-white/10 p-4 space-y-4 ${noAuctionsAvailable ? 'opacity-50' : ''}`}>
                   {/* Signature Canvas */}
                   <div>
                     <div className="flex justify-between items-center mb-2">
                       <p className="text-sm text-gray-300 arabic-text">التوقيع الرقمي:</p>
                       <button
                         type="button"
+                        disabled={noAuctionsAvailable}
                         onClick={() => {
                           signatureRef.current?.clear();
                           setSignature('');
                           setIsSignatureValid(false);
                         }}
-                        className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg transition-colors duration-200 text-sm arabic-text"
+                        className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg transition-colors duration-200 text-sm arabic-text disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         مسح التوقيع
                       </button>
                     </div>
-                    <SignatureCanvas
-                      ref={signatureRef}
-                      onSignatureChange={(signatureData: string) => {
-                        console.log('Signature received:', signatureData ? 'Has data' : 'Empty');
-                        
-                        // التحقق من أن التوقيع ليس فارغاً (ليس canvas فارغ)
-                        const isBlank = !signatureData || signatureData.endsWith('AAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==');
-                        
-                        if (!isBlank) {
-                          setSignature(signatureData);
-                          setIsSignatureValid(true);
-                        } else {
-                          setSignature('');
-                          setIsSignatureValid(false);
-                        }
-                      }}
-                      width={600}
-                      height={200}
-                      className="w-full h-48 bg-white rounded-lg border-2 border-dashed border-gray-300 cursor-crosshair"
-                    />
+                    <div className={`${noAuctionsAvailable ? 'pointer-events-none' : ''}`}>
+                      <SignatureCanvas
+                        ref={signatureRef}
+                        onSignatureChange={(signatureData: string) => {
+                          if (noAuctionsAvailable) return;
+                          console.log('Signature received:', signatureData ? 'Has data' : 'Empty');
+                          
+                          // التحقق من أن التوقيع ليس فارغاً (ليس canvas فارغ)
+                          const isBlank = !signatureData || signatureData.endsWith('AAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==');
+                          
+                          if (!isBlank) {
+                            setSignature(signatureData);
+                            setIsSignatureValid(true);
+                          } else {
+                            setSignature('');
+                            setIsSignatureValid(false);
+                          }
+                        }}
+                        width={600}
+                        height={200}
+                        className="w-full h-48 bg-white rounded-lg border-2 border-dashed border-gray-300 cursor-crosshair"
+                      />
+                    </div>
                   </div>
                   
                   <p className="text-sm text-gray-400 arabic-text">
-                    {isSignatureValid ? '✅ تم التوقيع بنجاح' : 'يرجى التوقيع لإتمام التسجيل'}
+                    {noAuctionsAvailable ? '⚠️ التسجيل غير متاح حالياً' : isSignatureValid ? '✅ تم التوقيع بنجاح' : 'يرجى التوقيع لإتمام التسجيل'}
                   </p>
                 </div>
               </div>
@@ -660,7 +715,7 @@ export default function RegisterPage() {
               <div className="flex flex-col sm:flex-row gap-4 pt-6">
                 <button
                   type="submit"
-                  disabled={isSubmitting || !isSignatureValid}
+                  disabled={isSubmitting || !isSignatureValid || noAuctionsAvailable}
                   className="flex-1 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-600 hover:to-purple-600 disabled:from-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/25 arabic-text"
                 >
                   <span className="flex items-center justify-center gap-2">
