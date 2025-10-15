@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, setPersistence, browserSessionPersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getDatabase } from 'firebase/database';
@@ -21,8 +21,28 @@ const app = getApps().length === 0 && firebaseConfig.apiKey
   ? initializeApp(firebaseConfig)
   : getApps()[0];
 
-// Initialize Firebase services only if app is available
-export const auth = app ? getAuth(app) : null;
+// Initialize Firebase Auth with session persistence
+let auth: ReturnType<typeof getAuth> | null = null;
+
+if (app) {
+  auth = getAuth(app);
+  
+  // Configure session persistence to browser session only
+  // This means the session will be cleared when the browser/tab is closed
+  // Combined with our inactivity timeout for complete session control
+  if (typeof window !== 'undefined') {
+    setPersistence(auth, browserSessionPersistence)
+      .then(() => {
+        console.log('Firebase Auth persistence set to SESSION mode');
+      })
+      .catch((error) => {
+        console.error('Error setting auth persistence:', error);
+      });
+  }
+}
+
+// Initialize other Firebase services
+export { auth };
 export const db = app ? getFirestore(app) : null;
 export const storage = app ? getStorage(app) : null;
 export const database = app ? getDatabase(app) : null;

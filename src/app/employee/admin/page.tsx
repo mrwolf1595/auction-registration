@@ -8,6 +8,7 @@ import { addAuthorizedUser, removeAuthorizedUser } from '@/lib/authorizedUsers';
 import { ref, onValue } from 'firebase/database';
 import { database } from '@/lib/firebase';
 import { Database } from 'firebase/database';
+import { useSessionManager } from '@/hooks/useSessionManager';
 
 interface AuthorizedUser {
   uid: string;
@@ -23,6 +24,11 @@ export default function AdminPage() {
   const [newEmail, setNewEmail] = useState('');
   const [message, setMessage] = useState({ text: '', type: '' });
   const router = useRouter();
+
+  // Session management with 30-minute inactivity timeout
+  useSessionManager(!!employee, {
+    redirectPath: '/employee/login',
+  });
 
   // تحميل قائمة المستخدمين المعتمدين
   const loadAuthorizedUsers = () => {

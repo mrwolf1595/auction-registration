@@ -17,7 +17,8 @@ export interface Registration {
   issuingBank: string;
   cheques: Array<{ number: string; amount: string }>;
   employeeName?: string;
-  signature?: string;
+  signature?: string; // توقيع العميل
+  employeeSignature?: string; // توقيع الموظف
   typedName?: string;
   registrationDate: string;
   status: 'pending' | 'completed' | 'customer-uploaded';
@@ -371,6 +372,28 @@ export const saveAuction = async (auction: Omit<Auction, 'id'>): Promise<string>
     }
     
     throw new Error('فشل في حفظ المزاد');
+  }
+};
+
+// Delete registration (for employees only)
+export const deleteRegistration = async (registrationId: string): Promise<void> => {
+  if (!database) {
+    throw new Error('Firebase Database لم يتم تهيئته بشكل صحيح');
+  }
+  
+  if (!auth?.currentUser) {
+    throw new Error('يجب تسجيل الدخول كموظف لحذف التسجيل');
+  }
+  
+  try {
+    const registrationRef = ref(database, `registrations/${registrationId}`);
+    
+    // Import remove function
+    const { remove } = await import('firebase/database');
+    await remove(registrationRef);
+  } catch (error) {
+    console.error('Error deleting registration:', error);
+    throw new Error('فشل في حذف التسجيل');
   }
 };
 

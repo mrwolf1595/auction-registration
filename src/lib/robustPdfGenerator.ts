@@ -297,15 +297,15 @@ export async function generateReceiptPDFWithJSPDF(formData: ValidatedFormData): 
     // Employee Information Section
     doc.setFontSize(16);
     doc.setTextColor(168, 85, 247);
-    doc.text('بيانات الموظف مستلم الشيك', 20, yPosition, { align: 'right' });
+    doc.text('بيانات الموظف المستلم', 20, yPosition, { align: 'right' });
     yPosition += 10;
     
     doc.setFontSize(12);
     doc.setTextColor(0, 0, 0);
     doc.text(`اسم الموظف: ${formData.employeeName}`, 20, yPosition, { align: 'right' });
     yPosition += 8;
-    doc.text(`التوقيع: ${formData.signature ? 'تم التوقيع' : (formData.typedName || 'لم يتم التوقيع')}`, 20, yPosition, { align: 'right' });
-    console.log('Receipt signature data:', formData.signature);
+    doc.text(`توقيع الموظف: ${formData.signature ? 'تم التوقيع' : (formData.typedName || 'لم يتم التوقيع')}`, 20, yPosition, { align: 'right' });
+    console.log('Receipt employee signature data:', formData.signature);
     
     // Add signature image if available
     if (formData.signature) {
@@ -600,15 +600,15 @@ export async function generateReceiptPNG(formData: ValidatedFormData, bidderNumb
       return sum + parseNumber(cheque.amount || '0');
     }, 0);
     
-    // Create HTML content for receipt with signature - يعرض الاتنين
+    // Create HTML content for receipt with employee signature
     let receiptSignatureHTML = '';
     
-    // إذا كان في توقيع رقمي
+    // إذا كان في توقيع رقمي للموظف
     if (formData.signature && formData.signature.startsWith('data:image')) {
       receiptSignatureHTML += `
         <div style="text-align: center; margin-top: 15px;">
-          <div style="font-size: 14px; font-weight: bold; color: #666; margin-bottom: 8px;">التوقيع الرقمي:</div>
-          <img src="${formData.signature}" style="max-width: 220px; max-height: 100px; border: 2px solid #666; padding: 8px; background: white;" alt="التوقيع الرقمي" />
+          <div style="font-size: 14px; font-weight: bold; color: #666; margin-bottom: 8px;">توقيع الموظف:</div>
+          <img src="${formData.signature}" style="max-width: 220px; max-height: 100px; border: 2px solid #666; padding: 8px; background: white;" alt="توقيع الموظف" />
         </div>`;
     }
     
@@ -625,7 +625,7 @@ export async function generateReceiptPNG(formData: ValidatedFormData, bidderNumb
         </div>`;
     }
     
-    // إذا مفيش حاجة، نعرض اسم الموظف
+    // إذا مفيش حاجة، نعرض مربع فارغ للتوقيع
     if (!receiptSignatureHTML) {
       receiptSignatureHTML = `
         <div style="margin-top: 20px; text-align: center;">
@@ -684,14 +684,13 @@ export async function generateReceiptPNG(formData: ValidatedFormData, bidderNumb
       </div>
       
       <div style="margin-bottom: 25px; padding: 15px; border: 2px solid #e0e0e0; border-radius: 8px; background: #fafafa;">
-        <h2 style="font-size: 20px; font-weight: bold; color: #a855f7; margin-bottom: 15px; border-bottom: 2px solid #a855f7; padding-bottom: 8px;">بيانات الموظف مستلم الشيك</h2>
+        <h2 style="font-size: 20px; font-weight: bold; color: #a855f7; margin-bottom: 15px; border-bottom: 2px solid #a855f7; padding-bottom: 8px;">بيانات الموظف المستلم</h2>
         <div style="line-height: 2;">
           <div style="margin-bottom: 10px; font-size: 16px;"><span style="font-weight: bold; color: #666; display: inline-block; width: 120px;">اسم الموظف:</span> <span style="color: #000; font-weight: bold;">${formData.employeeName}</span></div>
           <div style="margin-bottom: 10px; font-size: 16px;">
-            <span style="font-weight: bold; color: #666; display: inline-block; width: 120px;">التوقيع:</span> 
+            <span style="font-weight: bold; color: #666; display: inline-block; width: 120px;">توقيع الموظف:</span> 
             <span style="color: #000; font-weight: bold;">
-              ${formData.signature && formData.signature.startsWith('data:image') ? '✓ رقمي' : ''}
-              ${formData.signature && formData.signature.startsWith('data:image') && formData.typedName ? ' + ' : ''}
+              ${formData.signature && formData.signature.startsWith('data:image') ? '✓ تم التوقيع' : ''}
               ${formData.typedName ? '✓ مطبوع' : ''}
               ${!formData.signature && !formData.typedName ? 'لم يتم التوقيع' : ''}
             </span>

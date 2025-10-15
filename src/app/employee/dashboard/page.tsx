@@ -7,7 +7,7 @@ import { onAuthStateChange, signOutEmployee, EmployeeUser } from '@/lib/auth';
 import { saveAuction, listenToRegistrations, listenToAuctions, Registration, Auction } from '@/lib/database';
 import { auth } from '@/lib/firebase';
 import { checkAuthorizedUser } from '@/lib/authorizedUsers';
-
+import { useSessionManager } from '@/hooks/useSessionManager';
 
 export default function EmployeeDashboardPage() {
   const [employee, setEmployee] = useState<EmployeeUser | null>(null);
@@ -23,6 +23,20 @@ export default function EmployeeDashboardPage() {
     description: ''
   });
   const router = useRouter();
+
+  // Session management with 30-minute inactivity timeout
+  const sessionStatus = useSessionManager(!!employee, {
+    showWarning: true,
+    onWarning: () => {
+      // Show a toast or notification that session is about to expire
+      console.warn('Session expiring in 2 minutes!');
+    },
+    onLogout: () => {
+      // Clean up any local state before logout
+      console.log('Logging out due to inactivity...');
+    },
+    redirectPath: '/employee/login',
+  });
 
   useEffect(() => {
     console.log("Dashboard component mounted");
@@ -196,6 +210,22 @@ export default function EmployeeDashboardPage() {
             <p className="text-gray-300 arabic-text">
               مرحباً {employee?.displayName}
             </p>
+            {/* Session Status Indicator */}
+            {sessionStatus.isActive && (
+              <div className="mt-2 flex items-center gap-2">
+                <div className="flex items-center gap-1.5 text-xs">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  <span className="text-gray-400 arabic-text">
+                    الجلسة نشطة
+                  </span>
+                </div>
+                {sessionStatus.remainingMinutes <= 5 && (
+                  <div className="bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 px-2 py-0.5 rounded text-xs arabic-text">
+                    ستنتهي الجلسة خلال {sessionStatus.remainingMinutes} دقيقة
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex gap-4">
             {isAuthorized && (

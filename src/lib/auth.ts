@@ -5,6 +5,7 @@ import {
   User 
 } from 'firebase/auth';
 import { auth } from './firebase';
+import { sessionManager } from './sessionManager';
 
 export interface EmployeeUser {
   uid: string;
@@ -39,6 +40,9 @@ export const signInEmployee = async (email: string, password: string): Promise<E
     console.log('Auth state after login:', !!auth.currentUser);
     console.log('User UID:', user.uid);
     
+    // Note: Session manager will be started by the useSessionManager hook
+    // in the component that uses authentication
+    
     return {
       uid: user.uid,
       email: user.email!,
@@ -66,7 +70,11 @@ export const signOutEmployee = async (): Promise<void> => {
   }
   
   try {
+    // Stop session monitoring before signing out
+    sessionManager.stopMonitoring();
+    
     await signOut(auth);
+    console.log('User signed out successfully');
   } catch (error) {
     console.error('Error signing out:', error);
     throw error;

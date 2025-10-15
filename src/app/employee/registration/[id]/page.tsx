@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import SignatureCanvas from 'react-signature-canvas';
 import { onAuthStateChange, EmployeeUser } from '@/lib/auth';
-import { getRegistrations, updateRegistrationStatus } from '@/lib/database';
-import { generateCompressedPDF } from '@/lib/robustPdfGenerator';
-
+import { getRegistrations, updateRegistrationStatus, deleteRegistration } from '@/lib/database';
+import { generateRobustReceiptPDF, PdfGenerationResult } from '@/lib/robustPdfGenerator';
 import { Registration } from '@/lib/database';
 
 export default function RegistrationDetailPage() {
@@ -14,8 +15,32 @@ export default function RegistrationDetailPage() {
   const [employee, setEmployee] = useState<EmployeeUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [employeeSignature, setEmployeeSignature] = useState<string>('');
+  const signaturePadRef = useRef<SignatureCanvas>(null);
   const router = useRouter();
   const params = useParams();
+
+  const loadRegistration = useCallback(async () => {
+    try {
+      setIsLoading(true);
+
+      // Load registrations from Firebase
+      const registrations = await getRegistrations();
+      const foundRegistration = registrations.find(reg => reg.id === params.id);
+
+      if (foundRegistration) {
+        setRegistration(foundRegistration);
+      } else {
+        router.push('/employee/dashboard');
+      }
+    } catch (error) {
+      console.error('Error loading registration:', error);
+      router.push('/employee/dashboard');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [router, params.id]);
 
   useEffect(() => {
     // Check if employee is logged in
@@ -30,39 +55,58 @@ export default function RegistrationDetailPage() {
     });
 
     return () => unsubscribe();
-  }, [router, params.id]);
+  }, [loadRegistration, router]);
 
-  const loadRegistration = async () => {
+  const handleClearSignature = () => {
+    if (signaturePadRef.current) {
+      signaturePadRef.current.clear();
+      setEmployeeSignature('');
+    }
+  };
+
+  const handleSaveSignature = () => {
+    if (signaturePadRef.current && !signaturePadRef.current.isEmpty()) {
+      const signature = signaturePadRef.current.toDataURL();
+      setEmployeeSignature(signature);
+    }
+  };
+
+  const handleDeleteRegistration = async () => {
+    if (!registration) return;
+
+    const confirmed = confirm('هل أنت متأكد من حذف هذا التسجيل؟ لا يمكن التراجع عن هذا الإجراء.');
+    if (!confirmed) return;
+
+    setIsDeleting(true);
     try {
-      setIsLoading(true);
-      
-      // Load registrations from Firebase
-      const registrations = await getRegistrations();
-      const foundRegistration = registrations.find(reg => reg.id === params.id);
-      
-      if (foundRegistration) {
-        setRegistration(foundRegistration);
-      } else {
-        router.push('/employee/dashboard');
-      }
-    } catch (error) {
-      console.error('Error loading registration:', error);
+      await deleteRegistration(registration.id);
+      alert('تم حذف التسجيل بنجاح');
       router.push('/employee/dashboard');
+    } catch (error) {
+      console.error('Error deleting registration:', error);
+      alert('فشل في حذف التسجيل');
     } finally {
-      setIsLoading(false);
+      setIsDeleting(false);
     }
   };
 
   const handleGenerateReceipt = async () => {
     if (!registration || !employee) return;
 
+    // Check if employee has signed
+    if (!employeeSignature) {
+      alert('يجب على الموظف التوقيع أولاً قبل طباعة الإيصال');
+      return;
+    }
+
     setIsGeneratingPDF(true);
     
     try {
-      // Update registration with employee name
+      // Update registration with employee name and signature
       const updatedRegistration = {
         ...registration,
-        employeeName: employee.displayName
+        employeeName: employee.displayName,
+        employeeSignature: employeeSignature
       };
 
       // Convert Registration to ValidatedFormData format
@@ -74,16 +118,19 @@ export default function RegistrationDetailPage() {
         issuingBank: updatedRegistration.issuingBank,
         cheques: updatedRegistration.cheques,
         employeeName: updatedRegistration.employeeName || '',
-        signature: updatedRegistration.signature,
+        signature: updatedRegistration.employeeSignature || '', // Use employee signature instead of customer signature
         typedName: updatedRegistration.typedName || ''
       };
 
-      // Generate compressed PDF with bidder number
-      const result = await generateCompressedPDF(formData, registration.bidderNumber, true);
-      
-      if (result.blob) {
+      // Generate robust receipt PDF (uses html2canvas fallback for better Arabic support)
+      const result: PdfGenerationResult = await generateRobustReceiptPDF(formData, registration.bidderNumber);
+
+      // result may contain blob when successful (PdfGenerationResult.blob)
+      if (result && result.success && result.blob) {
+        const pdfBlob = result.blob;
+
         // Download the PDF
-        const url = URL.createObjectURL(result.blob);
+        const url = URL.createObjectURL(pdfBlob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `receipt_${registration.id}.pdf`;
@@ -97,7 +144,22 @@ export default function RegistrationDetailPage() {
 
         // Redirect to dashboard
         router.push('/employee/dashboard');
+      } else if ('blob' in result && result.blob) {
+        // Some generator helpers return a simple { blob, dataURL } shape
+        const pdfBlob = result.blob as Blob;
+        const url = URL.createObjectURL(pdfBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `receipt_${registration.id}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        await updateRegistrationStatus(registration.id, 'completed', employee.displayName);
+        router.push('/employee/dashboard');
       } else {
+        console.error('PDF generation failed:', result.error || result);
         alert('فشل في إنشاء ملف PDF');
       }
     } catch (error) {
@@ -255,6 +317,40 @@ export default function RegistrationDetailPage() {
 
               {/* Employee Actions */}
               <div className="space-y-6">
+                {/* Employee Signature Section */}
+                {registration.status === 'pending' && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-cyan-300 arabic-text mb-4">
+                      توقيع الموظف
+                    </h3>
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-4">
+                      <div className="bg-white rounded-lg p-2">
+                        <SignatureCanvas
+                          ref={signaturePadRef}
+                          canvasProps={{
+                            className: 'w-full h-32 border border-gray-300 rounded-lg',
+                            style: { touchAction: 'none' }
+                          }}
+                          onEnd={handleSaveSignature}
+                        />
+                      </div>
+                      <button
+                        onClick={handleClearSignature}
+                        className="w-full bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-semibold py-2 px-4 rounded-xl transition-all duration-300 arabic-text"
+                      >
+                        مسح التوقيع
+                      </button>
+                      {employeeSignature && (
+                        <div className="bg-green-500/20 border border-green-500/30 rounded-xl p-3 text-center">
+                          <p className="text-green-300 arabic-text text-sm">
+                            ✓ تم حفظ التوقيع
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <h3 className="text-lg font-semibold text-cyan-300 arabic-text mb-4">
                     إجراءات الموظف
@@ -266,27 +362,51 @@ export default function RegistrationDetailPage() {
                     </div>
                     
                     {registration.status === 'pending' ? (
-                      <button
-                        onClick={handleGenerateReceipt}
-                        disabled={isGeneratingPDF}
-                        className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-green-500/25 arabic-text disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isGeneratingPDF ? (
-                          <span className="flex items-center justify-center gap-2">
-                            <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            جاري إنشاء ملف PDF...
-                          </span>
-                        ) : (
-                          <span className="flex items-center justify-center gap-2">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            طباعة الإيصال (PNG)
-                          </span>
-                        )}
-                      </button>
+                      <>
+                        <button
+                          onClick={handleGenerateReceipt}
+                          disabled={isGeneratingPDF || !employeeSignature}
+                          className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-green-500/25 arabic-text disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isGeneratingPDF ? (
+                            <span className="flex items-center justify-center gap-2">
+                              <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                              جاري إنشاء ملف PDF...
+                            </span>
+                          ) : (
+                            <span className="flex items-center justify-center gap-2">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              {!employeeSignature ? 'يجب التوقيع أولاً' : 'طباعة الإيصال (PNG)'}
+                            </span>
+                          )}
+                        </button>
+                        
+                        <button
+                          onClick={handleDeleteRegistration}
+                          disabled={isDeleting}
+                          className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-red-500/25 arabic-text disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isDeleting ? (
+                            <span className="flex items-center justify-center gap-2">
+                              <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                              جاري الحذف...
+                            </span>
+                          ) : (
+                            <span className="flex items-center justify-center gap-2">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              حذف التسجيل
+                            </span>
+                          )}
+                        </button>
+                      </>
                     ) : (
                       <div className="space-y-2">
                         <div className="flex justify-between">
@@ -316,9 +436,12 @@ export default function RegistrationDetailPage() {
                       توقيع المزايد
                     </h3>
                     <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-                      <img 
+                      <Image 
                         src={registration.signature} 
                         alt="توقيع المزايد" 
+                        width={400}
+                        height={128}
+                        unoptimized
                         className="w-full h-32 object-contain bg-white rounded-lg"
                       />
                     </div>

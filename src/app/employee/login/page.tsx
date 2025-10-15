@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { signInEmployee, onAuthStateChange, EmployeeUser } from '@/lib/auth';
 
@@ -10,9 +10,19 @@ export default function EmployeeLoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [timeoutMessage, setTimeoutMessage] = useState('');
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
+    // Check if user was logged out due to timeout
+    const timeout = searchParams.get('timeout');
+    if (timeout === 'true') {
+      setTimeoutMessage('تم تسجيل الخروج تلقائياً بسبب عدم النشاط لمدة 30 دقيقة');
+      // Clear the timeout message after 10 seconds
+      setTimeout(() => setTimeoutMessage(''), 10000);
+    }
+    
     // Check if user is already logged in
     const unsubscribe = onAuthStateChange((user: EmployeeUser | null) => {
       if (user) {
@@ -21,7 +31,7 @@ export default function EmployeeLoginPage() {
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, [router, searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,6 +143,18 @@ export default function EmployeeLoginPage() {
                     required
                   />
                 </div>
+
+                {/* Timeout Message */}
+                {timeoutMessage && (
+                  <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-xl p-4">
+                    <div className="flex items-start gap-2">
+                      <svg className="w-5 h-5 text-yellow-300 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-yellow-300 arabic-text text-sm">{timeoutMessage}</p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Error Message */}
                 {error && (
