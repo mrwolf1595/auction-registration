@@ -11,7 +11,8 @@ const parseNumber = (value: string): number => {
   return parseFloat(value.replace(/,/g, '')) || 0;
 };
 
-// Utility function to compress images for smaller file size
+// Utility function to compress images for smaller file size (currently unused but may be used in future)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const compressImage = (canvas: HTMLCanvasElement, quality: number = 0.8): Promise<Blob> => {
   return new Promise((resolve) => {
     canvas.toBlob((blob) => {
@@ -729,8 +730,6 @@ export async function generateReceiptPNG(formData: ValidatedFormData, bidderNumb
       }, 'image/png', 1.0);
     });
     
-    const pngDataURL = canvas.toDataURL('image/png', 1.0);
-    
     // Convert PNG to PDF
     const pdfResult = await convertPNGToPDF(pngBlob);
     return pdfResult;
@@ -924,8 +923,6 @@ export async function generateDeclarationPNG(formData: ValidatedFormData, bidder
         else reject(new Error('Failed to create blob'));
       }, 'image/png', 1.0);
     });
-    
-    const pngDataURL = canvas.toDataURL('image/png', 1.0);
     
     // Convert PNG to PDF
     const pdfResult = await convertPNGToPDF(pngBlob);
